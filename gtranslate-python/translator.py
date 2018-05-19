@@ -7,24 +7,28 @@
 # use html.unescape rather than html.parser
 
 import os
+from re import findall
 from requests import Session
 from urllib.parse import urlencode, quote_plus
+from contextlib import closing
+
 
 try:
     from html.parser import HTMLParser
 except ImportError:
+    # handle python 2.
     from HTMLParser import HTMLParser
-
 
 from config import BASE_URL, AGENT
 
-BASE_URL = "http://translate.google.com/"
-
 
 class Translator(object):
-
+    """ Pythonic interface to Google Translate API for Python 2.7 and 3.x
+    with command line interface and proxy support.
+    Supports splitting or large requests to allow large queries.
+    """
     def __init__(self, proxies=None, base_url=BASE_URL, agent_spoof=AGENT,
-                 session=None, split_requests=True, request_limit=5000):
+                 session=None, split_requests=True):
         """
         Args:
             proxies (None, optional): http/https proxies
@@ -39,14 +43,10 @@ class Translator(object):
         self.base_url = base_url.rstrip('/')
         self.agent = agent_spoof
         self.session = session or Session()
-        if split_requests and (request_limit > 0):
-            self.split_requests = split_requests
-            self.request_limit = request_limit
-        else:
-            raise ArgumentError('request limit must be > 0 \
-                                 if split_requests is used')
+        self.split_requests = split_requests
 
-    def translate(self, text, from_lang='auto', to_lang='en'):
+    def translate(self, text, from_lang='auto', to_lang='en',
+                  max_chunk_size=4000):
         """Main method for translation via Google Translate API
 
         Args:
@@ -55,20 +55,24 @@ class Translator(object):
                 language detection will be used.
             to_lang (str, optional): language to translate to. If not
                 specified, will default to english
+            max_chunk_size (int, optional): charachter limit for requests
         Returns:
             (str) : translated text body
         """
-        if (len(text) > self.request_limit) and self.split_requests:
-            text_segments = _split_request(text)
+        if (len(text) > max_chunk_size) and (self.split_requests):
+            text_segments = self._split_request(text, max_chunk_size)
         else:
             text_segments = [text]
 
+        output = []
         for t in text_segments:
             url = self._construct_url(t, from_lang, to_lang)
-
             resp = self._make_request(url)
+            body = self._parse_content(resp)
+            output.append(body)
 
-            # parse resp content here and stuff
+        print(output)
+        return ''.join(output)
 
     def _construct_url(self, text, from_lang, to_lang):
         """
@@ -83,7 +87,7 @@ class Translator(object):
         params = {'hl': to_lang,
                   'sl': from_lang,
                   'q': text}
-        encoded_url = self.base_url + '/m?' + urlencode(f)
+        encoded_url = self.base_url + '/m?' + urlencode(params)
         return encoded_url
 
     def _parse_content(self, resp):
@@ -96,13 +100,13 @@ class Translator(object):
             TYPE: Description
         """
         expr = r'class="t0">(.*?)<'
-        re_result = re.findall(expr, resp.content)
+        re_result = findall(expr, resp.text)
         if (len(re_result) == 0):
             result = ""
         else:
             parser = HTMLParser()
-            parser.unescape(re_result[0])
-        return (result)
+            result = parser.unescape(re_result[0])
+        return result
 
     def _make_request(self, url):
         """
@@ -113,14 +117,14 @@ class Translator(object):
             TYPE: Description
         """
         with closing(self.session.get(url=url,
-                                      headers=agent,
+                                      headers=self.agent,
                                       proxies=self.proxies
                                       )
                      ) as resp:
             resp.raise_for_status()
             return resp
 
-    def splitter(text, max_chunk_size):
+    def _split_request(self, text, max_chunk_size):
         """ Splits text into list of strings,
         guarenteeing that no chunk ever
         exceeds max_chunk_size in length AND the text is split
@@ -135,17 +139,14 @@ class Translator(object):
             (list[str]): list of substrings
         """
 
-        # if input is already short enough, just need one chunk
         rem_length = len(text)
-        if rem_length < max_chunk_size:
-            return [text]
 
         chunks = []
         prev_cut_off = 0
         chunk = None
 
         while chunk != '':
-            cut_off = prev_cut_off + _cutoff_point(
+            cut_off = prev_cut_off + self._cutoff_point(
                                             text[prev_cut_off:
                                                  prev_cut_off + max_chunk_size
                                                  ]
@@ -166,7 +167,7 @@ class Translator(object):
 
         return chunks
 
-    def _cutoff_point(text, stops=' .,?!:'):
+    def _cutoff_point(self, text, stops=' .,?!:'):
         """Iterates through a string backwards
         until the first suitable end of sentence marker
         or whitespace is encountered where possible.
@@ -192,30 +193,4 @@ class Translator(object):
             i += 1
 
 
-
 if __name__ == '__main__':
-    #do CLI stuff here
-
-
-
-
-
-
-    def _construct_url(text='hello friend', from_lang='en', to_lang='fr'):
-        """
-        """
-        f = { 'hl' : to_lang, 'sl' : from_lang, 'q': text}
-        return BASE_URL + '/m?' + urlencode(f)
-
-
-
-
-
-
-
-
-
-
-
-
-
