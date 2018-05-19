@@ -1,17 +1,13 @@
-# client interface
 # CLI options
-# proxy support
-# splitting requests
-# agent spoofing
-# python 2 and 3 support
-# use html.unescape rather than html.parser
+# python 2 and 3 support (test this)
+
 
 import os
 from re import findall
 from requests import Session
 from urllib.parse import urlencode, quote_plus
 from contextlib import closing
-
+import argparse
 
 try:
     from html.parser import HTMLParser
@@ -75,14 +71,15 @@ class Translator(object):
         return ''.join(output)
 
     def _construct_url(self, text, from_lang, to_lang):
-        """
+        """Encodes url in required format.
+
         Args:
-            text (TYPE): Description
-            from_lang (TYPE): Description
-            to_lang (TYPE): Description
+            text (str): query text
+            from_lang (str): language to translate FROM
+            to_lang (str): language to translate TO
 
         Returns:
-            TYPE: Description
+            (str): encoded url
         """
         params = {'hl': to_lang,
                   'sl': from_lang,
@@ -91,13 +88,14 @@ class Translator(object):
         return encoded_url
 
     def _parse_content(self, resp):
-        """Gets translation from response
+        """Gets translation text body from response
 
         Args:
-            resp (TYPE): Description
+            resp (requests.Response): Repsonse object from
+                API call
 
         Returns:
-            TYPE: Description
+            str: translated text from the html block
         """
         expr = r'class="t0">(.*?)<'
         re_result = findall(expr, resp.text)
@@ -111,10 +109,10 @@ class Translator(object):
     def _make_request(self, url):
         """
         Args:
-            url (TYPE): Description
+            url (str): valid API URI
 
         Returns:
-            TYPE: Description
+            (requests.Response): response of request
         """
         with closing(self.session.get(url=url,
                                       headers=self.agent,
@@ -194,3 +192,4 @@ class Translator(object):
 
 
 if __name__ == '__main__':
+    argparse
