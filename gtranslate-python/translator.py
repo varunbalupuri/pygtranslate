@@ -1,13 +1,8 @@
-# CLI options
-# python 2 and 3 support (test this)
-
-
 import os
 from re import findall
 from requests import Session
 from urllib.parse import urlencode, quote_plus
 from contextlib import closing
-import argparse
 
 try:
     from html.parser import HTMLParser
@@ -43,8 +38,15 @@ class Translator(object):
 
     def translate(self, text, from_lang='auto', to_lang='en',
                   max_chunk_size=4000):
-        """Main method for translation via Google Translate API
+        """Main method for translation via Google's free Translate API
+        
+        Usage:
+        ________________________________________________
 
+        client = Translator()
+        client.translate('Bonjour', from_lang='fr')
+        ________________________________________________
+    
         Args:
             text (str): text to translate
             from_lang (str, optional): language of text, if not specified
@@ -67,7 +69,6 @@ class Translator(object):
             body = self._parse_content(resp)
             output.append(body)
 
-        print(output)
         return ''.join(output)
 
     def _construct_url(self, text, from_lang, to_lang):
@@ -192,4 +193,36 @@ class Translator(object):
 
 
 if __name__ == '__main__':
-    argparse
+    
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description='Google Translate API.')
+    
+    parser.add_argument('-t', '--to',
+                         dest='to_lang', action='store',
+                         default = 'en'
+                         )
+    parser.add_argument('-f', '-from',
+                         dest ='from_lang', action='store',
+                         default = 'auto'
+                         )
+    parser.add_argument('-q', '-query',
+                        dest = 'query',action='store',
+                        default = None
+                        )
+    args = parser.parse_args()
+    
+    if args.query is None:
+        sys.exit('Query text must be non-empty')
+
+    # translate
+    client = Translator()
+    text = client.translate(to_lang=args.to_lang,
+                     from_lang=args.from_lang,
+                     text = args.query
+                     )
+
+    print(text)
+
+
