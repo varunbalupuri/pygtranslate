@@ -18,7 +18,7 @@ class Translator(object):
     with command line interface and proxy support.
     Supports splitting or large requests to allow large queries.
     """
-    def __init__(self, proxies=None, base_url=BASE_URL, agent_spoof=AGENT,
+    def __init__(self, proxy=None, base_url=BASE_URL, agent_spoof=AGENT,
                  session=None, split_requests=True):
         """
         Args:
@@ -30,7 +30,11 @@ class Translator(object):
                 splitting functionality
             request_limit (int, optional): charachter limit for requests
         """
-        self.proxies = proxies or os.getenv('HTTPS_PROXY')
+        proxy = proxy or os.getenv('HTTPS_PROXY')
+        if proxy is not None:
+            self.proxies = {'HTTPS_PROXY': proxy}
+        else:
+            self.proxies = None
         self.base_url = base_url.rstrip('/')
         self.agent = agent_spoof
         self.session = session or Session()
