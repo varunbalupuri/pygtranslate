@@ -1,5 +1,6 @@
 import os
 from re import findall
+import logging
 from requests import Session
 from urllib.parse import urlencode, quote_plus
 from contextlib import closing
@@ -10,7 +11,19 @@ except ImportError:
     # handle python 2.
     from HTMLParser import HTMLParser
 
-from config import BASE_URL, AGENT
+BASE_URL = "http://translate.google.com/"
+
+AGENT = {'User-Agent':
+         "Mozilla/4.0 (\
+          compatible;\
+          MSIE 6.0;\
+          Windows NT 5.1;\
+          SV1;\
+          .NET CLR 1.1.4322;\
+          .NET CLR 2.0.50727;\
+          .NET CLR 3.0.04506.30\
+          )"
+         }
 
 
 class Translator(object):
@@ -19,7 +32,7 @@ class Translator(object):
     Supports splitting or large requests to allow large queries.
     """
     def __init__(self, proxy=None, base_url=BASE_URL, agent_spoof=AGENT,
-                 session=None, split_requests=True):
+                 session=None, split_requests=True, logger=None):
         """
         Args:
             proxies (None, optional): http/https proxies
@@ -28,7 +41,7 @@ class Translator(object):
             session (None, optional): Pass an existing requests.Session
             split_requests (bool, optional): Flag to enable request
                 splitting functionality
-            request_limit (int, optional): charachter limit for requests
+            logger (python logger): default logger
         """
         proxy = proxy or os.getenv('HTTPS_PROXY')
         if proxy is not None:
@@ -39,6 +52,7 @@ class Translator(object):
         self.agent = agent_spoof
         self.session = session or Session()
         self.split_requests = split_requests
+        self.logger = logger or logging.getLogger(__name__)
 
     def translate(self, text, from_lang='auto', to_lang='en',
                   max_chunk_size=4000):
@@ -63,8 +77,10 @@ class Translator(object):
         """
         if (len(text) > max_chunk_size) and (self.split_requests):
             text_segments = self._split_request(text, max_chunk_size)
+            self.logger.info('chunked text segments are: {}'.format(text_segments))
         else:
             text_segments = [text]
+            self.logger.info('using single text segment')
 
         output = []
         for t in text_segments:
@@ -73,7 +89,7 @@ class Translator(object):
             body = self._parse_content(resp)
             output.append(body)
 
-        return ''.join(output)
+        return ''.join(output).replace(u'\xa0', u' ')
 
     def _construct_url(self, text, from_lang, to_lang):
         """Encodes url in required format.
@@ -90,6 +106,7 @@ class Translator(object):
                   'sl': from_lang,
                   'q': text}
         encoded_url = self.base_url + '/m?' + urlencode(params)
+        self.logger.info('query URI: {}'.format(encoded_url))
         return encoded_url
 
     def _parse_content(self, resp):
@@ -106,6 +123,7 @@ class Translator(object):
         re_result = findall(expr, resp.text)
         if (len(re_result) == 0):
             result = ""
+            self.logger.warning('found no valid translated text body')
         else:
             parser = HTMLParser()
             result = parser.unescape(re_result[0])
@@ -119,12 +137,14 @@ class Translator(object):
         Returns:
             (requests.Response): response of request
         """
+        self.logger.debug('making request to url')
         with closing(self.session.get(url=url,
                                       headers=self.agent,
                                       proxies=self.proxies
                                       )
                      ) as resp:
             resp.raise_for_status()
+            self.logger.debug('resp: {}'.format(resp))
             return resp
 
     def _split_request(self, text, max_chunk_size):
