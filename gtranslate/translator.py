@@ -1,15 +1,17 @@
+# -*- coding: utf-8 -*-
 import os
 from re import findall
 import logging
 from requests import Session
-from urllib.parse import urlencode, quote_plus
 from contextlib import closing
 
 try:
     from html.parser import HTMLParser
+    from urllib.parse import urlencode, quote_plus
 except ImportError:
     # handle python 2.
     from HTMLParser import HTMLParser
+    from urllib import urlencode, quote_plus
 
 BASE_URL = "http://translate.google.com/"
 
