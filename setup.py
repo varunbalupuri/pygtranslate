@@ -1,7 +1,7 @@
 from distutils.core import setup
 setup(
   name = 'gtranslate',
-  packages = ['mypackage'],
+  packages = ['gtranslate'],
   version = '0.1',
   description = 'pythonic interface to google translate services',
   author = 'Varun Balupuri',
